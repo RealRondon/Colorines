@@ -1,0 +1,66 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #f0f2f5;
+  font-family: system-ui, -apple-system, sans-serif;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  touch-action: manipulation; /* Optimiza los toques en iPad */
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 90%;
+  max-width: 600px;
+}
+
+.palette {
+  display: flex;
+  gap: 12px;
+  background: #ffffff;
+  padding: 12px 20px;
+  border-radius: 30px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.color-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 3px solid transparent;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+}
+
+.color-btn.active {
+  border-color: #333333;
+  transform: scale(1.15);
+}
+
+.canvas-container {
+  width: 100%;
+  background: #ffffff;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+svg {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.paintable {
+  cursor: pointer;
+  transition: fill 0.15s ease;
+}
