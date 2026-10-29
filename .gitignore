@@ -1,0 +1,13 @@
+# Archivos del sistema operativo (macOS y Windows)
+.DS_Store
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Configuración local de Visual Studio Code
+.vscode/
+*.code-workspace
+
+# Logs de error y temporales
+*.log
+*.tmp
