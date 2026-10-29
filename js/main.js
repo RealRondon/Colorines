@@ -1,5 +1,3 @@
-// js/main.js
-
 window.addEventListener('load', () => {
   const mainMenu = document.getElementById('main-menu');
   const gameScreen = document.getElementById('game-screen');
@@ -8,18 +6,39 @@ window.addEventListener('load', () => {
   const headerTitle = document.getElementById('header-title');
   const searchGrid = document.getElementById('search-grid');
 
-  // 1. GENERAR EL GRID DE 30 CUADRADOS (Llama a la función de drawings.js)
+  let paintCanvas, paintCtx;
+  let mapCanvas, mapCtx;
+
+  // COLOR SELECCIONADO EN LA PALETA (Número activo)
+  let selectedColorNumber = 1;
+
+  // 1. CONFIGURACIÓN DE LA PALETA REAL DEL DIBUJO
+  const COLOR_PALETTE = {
+    1: '#ffdd59', // Número 1: Amarillo
+    2: '#3867d6', // Número 2: Azul
+    3: '#4b6584', // Número 3: Gris/Negro
+    4: '#eb3b5a'  // Número 4: Rojo
+  };
+
+  // 2. MAPA DE COLORES VISIBLES USADOS EN Dibujo-1-map.png
+  const MASK_COLOR_MAP = {
+    'ff0000': 1, // Rojo en map.png -> Zona Número 1
+    '00ff00': 2, // Verde en map.png -> Zona Número 2
+    '0000ff': 3, // Azul en map.png -> Zona Número 3
+    'ffff00': 4  // Amarillo en map.png -> Zona Número 4
+  };
+
+  // GENERAR TARJETAS
   if (typeof renderSearchGrid === 'function' && searchGrid) {
     renderSearchGrid(searchGrid, 30);
   }
 
-  // 2. POSICIÓN INICIAL EN LA PESTAÑA "BUSCAR" (Índice 1)
+  // CARRUSEL
   let currentTabIndex = 1;
   if (tabSlider) {
     tabSlider.style.transform = 'translateX(-33.33333%)';
   }
 
-  // 3. NAVEGACIÓN Y CAMBIO DE PESTAÑAS (CARRUSEL)
   navItems.forEach((item) => {
     item.addEventListener('click', () => {
       const tabIndex = parseInt(item.getAttribute('data-tab'));
@@ -32,37 +51,31 @@ window.addEventListener('load', () => {
       tabSlider.style.transform = `translateX(${offsetPercentage}%)`;
 
       currentTabIndex = tabIndex;
-      if (headerTitle) {
-        headerTitle.textContent = item.getAttribute('data-title');
-      }
+      if (headerTitle) headerTitle.textContent = item.getAttribute('data-title');
     });
   });
 
-  // 4. ABRIR EL LIENZO, CARGAR EL SVG Y GESTIONAR EL BOTÓN DE VOLVER
-  document.addEventListener('click', async (e) => {
-    // A) Al tocar cualquier tarjeta con la clase .play-trigger
+  // SELECCIÓN DE BOTELLAS DE COLOR NUMERADAS
+  const colorButtons = document.querySelectorAll('.color-btn');
+  colorButtons.forEach((btn) => {
+    btn.addEventListener('click', () => {
+      colorButtons.forEach((b) => b.classList.remove('active'));
+      btn.classList.add('active');
+      selectedColorNumber = parseInt(btn.getAttribute('data-number'));
+    });
+  });
+
+  // NAVEGACIÓN Y CAMBIO DE PANTALLA
+  document.addEventListener('click', (e) => {
     const trigger = e.target.closest('.play-trigger');
     if (trigger) {
-      const canvasContainer = document.getElementById('canvas-container');
-
-      try {
-        const response = await fetch('imgs/dibujo1.svg');
-        if (!response.ok) throw new Error('No se encontró el SVG en imgs/');
-
-        const svgText = await response.text();
-        if (canvasContainer) {
-          canvasContainer.innerHTML = svgText;
-        }
-      } catch (error) {
-        console.warn('Error al cargar el SVG:', error);
-      }
+      loadColorByNumberDrawing(1);
 
       if (mainMenu) mainMenu.classList.remove('active');
       if (gameScreen) gameScreen.classList.add('active');
       return;
     }
 
-    // B) Al tocar el botón "← Menú"
     const backBtn = e.target.closest('#btn-back');
     if (backBtn) {
       if (gameScreen) gameScreen.classList.remove('active');
@@ -70,25 +83,173 @@ window.addEventListener('load', () => {
     }
   });
 
-  // 5. LÓGICA DE SELECCIÓN DE COLOR Y PINTADO
-  let selectedColor = '#ff4757';
-  const colorButtons = document.querySelectorAll('.color-btn');
+  // CARGAR DIBUJO DUAL (CANVAS VISIBLE + MÁSCARA OCULTA)
+  function loadColorByNumberDrawing(id = 1) {
+    paintCanvas = document.getElementById('paint-canvas');
+    mapCanvas = document.getElementById('map-canvas');
+    const overlay = document.getElementById('lineart-overlay');
 
-  colorButtons.forEach((btn) => {
-    btn.addEventListener('click', () => {
-      colorButtons.forEach((b) => b.classList.remove('active'));
-      btn.classList.add('active');
-      selectedColor = btn.getAttribute('data-color');
-    });
-  });
+    if (!paintCanvas || !mapCanvas || !overlay) return;
 
-  document.addEventListener('pointerdown', (e) => {
-    const canvasContainer = document.getElementById('canvas-container');
-    if (canvasContainer && canvasContainer.contains(e.target)) {
-      if (e.target.tagName !== 'svg') {
-        e.target.setAttribute('fill', selectedColor);
-        e.target.style.fill = selectedColor;
+    paintCtx = paintCanvas.getContext('2d');
+    mapCtx = mapCanvas.getContext('2d');
+
+    const linesPath = `imgs/Dibujo-${id}-lines.png`;
+    const mapPath = `imgs/Dibujo-${id}-map.png`;
+
+    const linesImg = new Image();
+    const mapImg = new Image();
+
+    linesImg.src = linesPath;
+    linesImg.onload = () => {
+      const w = linesImg.naturalWidth || 1080;
+      const h = linesImg.naturalHeight || 1080;
+
+      paintCanvas.width = w;
+      paintCanvas.height = h;
+      mapCanvas.width = w;
+      mapCanvas.height = h;
+
+      // Fondo blanco en el lienzo visible
+      paintCtx.fillStyle = '#ffffff';
+      paintCtx.fillRect(0, 0, w, h);
+
+      overlay.src = linesPath;
+
+      // Cargar la máscara en el lienzo oculto
+      mapImg.src = mapPath;
+      mapImg.onload = () => {
+        mapCtx.drawImage(mapImg, 0, 0, w, h);
+      };
+    };
+  }
+
+  // DETECCIÓN DE INTERACCIÓN Y VALIDACIÓN
+  // DETECCIÓN DE INTERACCIÓN Y RELLENO POR BOTE DE PINTURA (FLOOD FILL)
+// DETECCIÓN DE INTERACCIÓN Y RELLENO POR BOTE DE PINTURA (FLOOD FILL)
+document.addEventListener('pointerdown', (e) => {
+  if (!paintCanvas || !mapCanvas) return;
+
+  const rect = paintCanvas.getBoundingClientRect();
+  if (
+    e.clientX < rect.left || e.clientX > rect.right ||
+    e.clientY < rect.top || e.clientY > rect.bottom
+  ) return;
+
+  const scaleX = paintCanvas.width / rect.width;
+  const scaleY = paintCanvas.height / rect.height;
+
+  const x = Math.floor((e.clientX - rect.left) * scaleX);
+  const y = Math.floor((e.clientY - rect.top) * scaleY);
+
+  // 1. Leer el color de la máscara en la capa oculta
+  const pixel = mapCtx.getImageData(x, y, 1, 1).data;
+  const hexMask = rgbToHex(pixel[0], pixel[1], pixel[2]);
+
+  const touchedRegionID = MASK_COLOR_MAP[hexMask];
+
+  // 2. Comprobar si la región tocada coincide con el número activo de la paleta
+  if (touchedRegionID && touchedRegionID === selectedColorNumber) {
+    const finalHexColor = COLOR_PALETTE[touchedRegionID];
+    
+    // ACIERTO: Rellenar la región completa con Bote de Pintura (Flood Fill)
+    floodFillRegion(x, y, finalHexColor, hexMask);
+  } else {
+    console.warn(`Número incorrecto. Seleccionado: ${selectedColorNumber}`);
+  }
+});
+
+// ALGORITMO BOTE DE PINTURA (FLOOD FILL) BASADO EN LA MÁSCARA OCULTA
+// ALGORITMO FLOOD FILL CON DILATACIÓN DE 1PX (ELIMINA BORDES ASERRADOS)
+function floodFillRegion(startX, startY, fillHex, targetHexMask) {
+  const width = paintCanvas.width;
+  const height = paintCanvas.height;
+
+  const mapImageData = mapCtx.getImageData(0, 0, width, height);
+  const paintImageData = paintCtx.getImageData(0, 0, width, height);
+
+  const mapData = mapImageData.data;
+  const paintData = paintImageData.data;
+
+  const fillRGB = hexToRgb(fillHex);
+
+  const queue = [[startX, startY]];
+  const visited = new Uint8Array(width * height);
+  const filledPixels = []; // Guardamos los píxeles rellenos para expandir el borde
+
+  while (queue.length > 0) {
+    const [cx, cy] = queue.pop();
+    const idx = cy * width + cx;
+
+    if (visited[idx]) continue;
+    visited[idx] = 1;
+
+    const pixelOffset = idx * 4;
+
+    const currentPixelHex = rgbToHex(
+      mapData[pixelOffset],
+      mapData[pixelOffset + 1],
+      mapData[pixelOffset + 2]
+    );
+
+    // Si coincide con la máscara de la región
+    if (currentPixelHex === targetHexMask) {
+      filledPixels.push(cx, cy); // Almacenar coordenada
+
+      paintData[pixelOffset] = fillRGB.r;
+      paintData[pixelOffset + 1] = fillRGB.g;
+      paintData[pixelOffset + 2] = fillRGB.b;
+      paintData[pixelOffset + 3] = 255;
+
+      if (cx + 1 < width) queue.push([cx + 1, cy]);
+      if (cx - 1 >= 0) queue.push([cx - 1, cy]);
+      if (cy + 1 < height) queue.push([cx, cy + 1]);
+      if (cy - 1 >= 0) queue.push([cx, cy - 1]);
+    }
+  }
+
+  // PASADA DE SANGRADO: Expande el color 1 píxel hacia afuera
+  for (let i = 0; i < filledPixels.length; i += 2) {
+    const px = filledPixels[i];
+    const py = filledPixels[i + 1];
+
+    const neighbors = [
+      [px + 1, py],
+      [px - 1, py],
+      [px, py + 1],
+      [px, py - 1]
+    ];
+
+    for (const [nx, ny] of neighbors) {
+      if (nx >= 0 && nx < width && ny >= 0 && ny < height) {
+        const nIdx = (ny * width + nx) * 4;
+        // Solo pintamos si ese píxel vecino no era ya del color pleno
+        paintData[nIdx] = fillRGB.r;
+        paintData[nIdx + 1] = fillRGB.g;
+        paintData[nIdx + 2] = fillRGB.b;
+        paintData[nIdx + 3] = 255;
       }
     }
-  });
+  }
+
+  // Volcar los cambios en el Canvas visible
+  paintCtx.putImageData(paintImageData, 0, 0);
+}
+
+// --- FUNCIONES AUXILIARES DE CONVERSIÓN DE COLOR ---
+
+// Convierte valores R, G, B individuales (0-255) a string hexadecimal (ej: "ff0000")
+function rgbToHex(r, g, b) {
+  return [r, g, b].map(x => x.toString(16).padStart(2, '0')).join('');
+}
+
+// Convierte un string hexadecimal ("#ff0000") a un objeto RGB {r, g, b}
+function hexToRgb(hex) {
+  const bigint = parseInt(hex.replace('#', ''), 16);
+  return {
+    r: (bigint >> 16) & 255,
+    g: (bigint >> 8) & 255,
+    b: bigint & 255
+  };
+}
 });

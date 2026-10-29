@@ -2,99 +2,81 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Juego de Pintar</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>Juego de Colorear</title>
   
-  <link rel="icon" type="image/png" href="imgs/icon.png">
-  <link rel="apple-touch-icon" href="imgs/icon.png">
-  
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="apple-mobile-web-app-title" content="Pintar Colores">
-  
-  <link rel="stylesheet" href="style.css">
+  <link rel="shortcut icon" href="data:image/x-icon;," type="image/x-icon">
+
+  <!-- Estilos modulares -->
+  <link rel="stylesheet" href="css/components.css">
+  <link rel="stylesheet" href="css/screens.css">
+  <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
 
-  <!-- PANTALLA 1: Menú Principal -->
-  <section id="main-menu" class="screen active">
+  <!-- PANTALLA PRINCIPAL / MENÚ -->
+  <div id="main-menu" class="screen active">
     <header class="app-header">
-      <h1 id="header-title">Buscar Dibujos</h1>
+      <h1 id="header-title">Buscar</h1>
     </header>
 
-    <main class="menu-feed">
-      <div class="tab-slider" id="tab-slider" style="transform: translateX(-33.33333%);">
-        
-        <!-- PESTAÑA 0: Mis Dibujos -->
-        <div id="tab-my-drawings" class="tab-content">
-          <div class="card-preview play-trigger">
-            <div class="placeholder-square">
-              <span>Toca para pintar</span>
-            </div>
-            <div class="card-info">
-              <h3>Dibujo 1 - Paisaje</h3>
-            </div>
-          </div>
-        </div>
+    <main class="menu-content">
+      <div id="tab-slider" class="tab-slider">
+        <!-- Pestaña 0: Mis Dibujos -->
+        <section class="tab-page">
+          <h2>Mis Dibujos</h2>
+        </section>
 
-        <!-- PESTAÑA 1: Buscar (Grid de 30 cuadrados) -->
-        <div id="tab-search" class="tab-content">
-          <div class="search-grid" id="search-grid"></div>
-        </div>
+        <!-- Pestaña 1: Buscar (Grid de 30) -->
+        <section class="tab-page">
+          <div id="search-grid" class="grid-container"></div>
+        </section>
 
-        <!-- PESTAÑA 2: Ajustes -->
-        <div id="tab-settings" class="tab-content">
-          <p class="settings-placeholder">Opciones de configuración...</p>
-        </div>
-
+        <!-- Pestaña 2: Ajustes -->
+        <section class="tab-page">
+          <h2>Ajustes</h2>
+        </section>
       </div>
     </main>
 
-    <!-- Barra de Navegación Inferior -->
+    <!-- Barra Inferior Fija -->
     <nav class="bottom-nav">
-      <button class="nav-item" data-tab="0" data-title="Mis Dibujos">
-        <span class="nav-icon">🖼️</span>
-        <span class="nav-label">Mis dibujos</span>
-      </button>
-      <button class="nav-item active" data-tab="1" data-title="Buscar Dibujos">
-        <span class="nav-icon">🔍</span>
-        <span class="nav-label">Buscar</span>
-      </button>
-      <button class="nav-item" data-tab="2" data-title="Ajustes">
-        <span class="nav-icon">⚙️</span>
-        <span class="nav-label">Ajustes</span>
-      </button>
+      <button class="nav-item" data-tab="0" data-title="Mis Dibujos">Mis dibujos</button>
+      <button class="nav-item active" data-tab="1" data-title="Buscar">Buscar</button>
+      <button class="nav-item" data-tab="2" data-title="Ajustes">Ajustes</button>
     </nav>
-  </section>
+  </div>
 
-  <!-- PANTALLA 2: Lienzo de Juego -->
-  <section id="game-screen" class="screen">
+  <!-- PANTALLA DE JUEGO (SISTEMA DE MÁSCARA Y PINTURA) -->
+  <div id="game-screen" class="screen">
     <header class="game-header">
-      <button id="btn-back" class="btn-back"> ← </button>
+      <button id="btn-back" class="btn-back">← Menú</button>
+      <h2>¡A colorear por números!</h2>
     </header>
 
-    <main class="app-container">
-      <div class="palette">
-        <button class="color-btn active" data-color="#ff4757" style="background-color: #ff4757;"></button>
-        <button class="color-btn" data-color="#2ed573" style="background-color: #2ed573;"></button>
-        <button class="color-btn" data-color="#1e90ff" style="background-color: #1e90ff;"></button>
-        <button class="color-btn" data-color="#ffa502" style="background-color: #ffa502;"></button>
-        <button class="color-btn" data-color="#9b59b6" style="background-color: #9b59b6;"></button>
-      </div>
+    <main class="game-content">
+      <div id="canvas-container" class="canvas-container">
+        <!-- Capa 1: Canvas de Pintura Visible -->
+        <canvas id="paint-canvas"></canvas>
+        
+        <!-- Capa 2: Líneas y números transparentes superpuestos -->
+        <img id="lineart-overlay" src="" alt="Líneas del dibujo" />
 
-      <div class="canvas-container" id="canvas-container">
-        <svg id="paint-svg" viewBox="0 0 500 500" xmlns="http://www.w3.org/2000/svg">
-          <path class="paintable" d="M 0 0 H 500 V 500 H 0 Z" fill="#ffffff" stroke="#2c3e50" stroke-width="4"/>
-          <circle class="paintable" cx="250" cy="140" r="50" fill="#ffffff" stroke="#2c3e50" stroke-width="4"/>
-          <path class="paintable" d="M 30 380 L 180 180 L 280 380 Z" fill="#ffffff" stroke="#2c3e50" stroke-width="4"/>
-          <path class="paintable" d="M 200 380 L 330 220 L 470 380 Z" fill="#ffffff" stroke="#2c3e50" stroke-width="4"/>
-          <path class="paintable" d="M 0 380 Q 250 340 500 380 V 500 H 0 Z" fill="#ffffff" stroke="#2c3e50" stroke-width="4"/>
-        </svg>
+        <!-- Capa 3: Canvas Oculto para detectar las zonas de color en el mapa -->
+        <canvas id="map-canvas" style="display: none;"></canvas>
       </div>
     </main>
-  </section>
 
+    <!-- Paleta de Colores Numerada (Estilo Happy Color) -->
+    <footer class="color-palette">
+      <button class="color-btn active" data-number="1" style="background-color: #ffdd59;">1</button>
+      <button class="color-btn" data-number="2" style="background-color: #3867d6;">2</button>
+      <button class="color-btn" data-number="3" style="background-color: #4b6584;">3</button>
+      <button class="color-btn" data-number="4" style="background-color: #eb3b5a;">4</button>
+    </footer>
+  </div>
+
+  <!-- Carga de Scripts -->
   <script src="js/drawings.js"></script>
   <script src="js/main.js"></script>
 </body>
