@@ -1,0 +1,25 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: #ffffff;
+  font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  min-height: 100vh;
+  touch-action: manipulation;
+  overflow-x: hidden;
+}
+
+/* Gestor de Pantallas */
+.screen {
+  display: none;
+  width: 100%;
+  min-height: 100vh;
+}
+
+.screen.active {
+  display: flex;
+  flex-direction: column;
+}
