@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Convertidor 1:1 de Máscara y Paleta</title>
+  <style>
+    body { font-family: system-ui, sans-serif; padding: 20px; background: #f4f4f9; color: #1c1c1e; }
+    .box { background: white; padding: 24px; border-radius: 12px; max-width: 650px; box-shadow: 0 4px 15px rgba(0,0,0,0.08); }
+    .control-group { margin: 15px 0; }
+    label { font-weight: bold; display: block; margin-bottom: 5px; }
+    input[type="range"] { width: 100%; }
+    textarea { width: 100%; height: 160px; font-family: monospace; font-size: 13px; margin-top: 10px; }
+    img { max-width: 250px; margin-top: 10px; border: 1px solid #ccc; border-radius: 8px; display: block; }
+    button { padding: 12px 20px; background: #007aff; color: white; border: none; border-radius: 8px; font-weight: bold; cursor: pointer; }
+    button:disabled { background: #ccc; }
+    .stats { font-weight: bold; color: #007aff; margin-top: 10px; font-size: 1.1rem; }
+  </style>
+</head>
+<body>
+
+<div class="box">
+  <h2>Convertidor 1:1 (Limpio)</h2>
+  <p>Carga la imagen a color de referencia (<code>colored.png</code>):</p>
+  
+  <div class="control-group">
+    <input type="file" id="imageInput" accept="image/png, image/jpeg">
+  </div>
+
+  <div class="control-group">
+    <label for="tolerance">Tolerancia de agrupar colores: <span id="toleranceVal">30</span></label>
+    <input type="range" id="tolerance" min="5" max="80" value="30">
+    <small>Aumenta este valor si te salen más colores de los que realmente tiene el dibujo.</small>
+  </div>
+
+  <button id="processBtn" disabled>Generar Máscara y Paleta Exacta</button>
+
+  <div id="stats" class="stats"></div>
+
+  <h3>1. Máscara Generada (Guardar como <code>Dibujo-X-map.png</code>):</h3>
+  <img id="resultImage" alt="Resultado de la máscara" />
+
+  <h3>2. Paleta exacta para <code>js/drawings.js</code>:</h3>
+  <textarea id="paletteOutput" readonly></textarea>
+</div>
+
+<script>
+  const imageInput = document.getElementById('imageInput');
+  const toleranceInput = document.getElementById('tolerance');
+  const toleranceVal = document.getElementById('toleranceVal');
+  const processBtn = document.getElementById('processBtn');
+  const resultImage = document.getElementById('resultImage');
+  const paletteOutput = document.getElementById('paletteOutput');
+  const stats = document.getElementById('stats');
+
+  let loadedImg = null;
+
+  toleranceInput.addEventListener('input', (e) => {
+    toleranceVal.textContent = e.target.value;
+  });
+
+  imageInput.addEventListener('change', (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      loadedImg = new Image();
+      loadedImg.onload = () => { processBtn.disabled = false; };
+      loadedImg.src = event.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  // Distancia cromática RGB
+  function colorDistance(r1, g1, b1, r2, g2, b2) {
+    return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+  }
+
+  processBtn.addEventListener('click', () => {
+    if (!loadedImg) return;
+
+    const width = loadedImg.naturalWidth;
+    const height = loadedImg.naturalHeight;
+    const tolerance = parseInt(toleranceInput.value);
+
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const ctx = canvas.getContext('2d');
+
+    ctx.drawImage(loadedImg, 0, 0);
+
+    const imgData = ctx.getImageData(0, 0, width, height);
+    const data = imgData.data;
+
+    const palette = []; // Guardará { id, r, g, b, hex }
+    
+    // PASO 1: Detectar y agrupar colores únicos principales
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+
+      // Omitir píxeles transparentes o blancos de fondo
+      if (a < 10 || (r > 245 && g > 245 && b > 245)) continue;
+
+      // Omitir líneas negras puras
+      if (r < 15 && g < 15 && b < 15) continue;
+
+      // Comprobar si coincide con un color ya existente en la paleta
+      let match = palette.find(item => colorDistance(r, g, b, item.r, item.g, item.b) <= tolerance);
+
+      if (!match) {
+        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+        palette.push({ id: palette.length + 1, r, g, b, hex });
+      }
+    }
+
+    // PASO 2: Pintar la máscara (map.png) asignando CADA píxel a su ID exacto (1..N)
+    for (let i = 0; i < data.length; i += 4) {
+      const r = data[i];
+      const g = data[i + 1];
+      const b = data[i + 2];
+      const a = data[i + 3];
+
+      if (a < 10 || (r > 245 && g > 245 && b > 245)) {
+        data[i] = 0;     // Fondo = R: 0
+        data[i + 1] = 0;
+        data[i + 2] = 0;
+        data[i + 3] = 0;
+        continue;
+      }
+
+      // Buscar el color más cercano en la paleta final compilada
+      let closestID = 1;
+      let minDistance = Infinity;
+
+      for (const item of palette) {
+        const dist = colorDistance(r, g, b, item.r, item.g, item.b);
+        if (dist < minDistance) {
+          minDistance = dist;
+          closestID = item.id;
+        }
+      }
+
+      // Guardar ID en la canal Roja
+      data[i] = closestID;
+      data[i + 1] = 0;
+      data[i + 2] = 0;
+      data[i + 3] = 255;
+    }
+
+    ctx.putImageData(imgData, 0, 0);
+
+    // Mostrar imagen y texto
+    resultImage.src = canvas.toDataURL('image/png');
+    stats.textContent = `✅ ¡Hecho! Paleta compilada con exactamente ${palette.length} colores (Regiones 1 a ${palette.length}).`;
+
+    // Código formateado para js/drawings.js
+    let code = "palette: [\n";
+    palette.forEach(item => {
+      code += `  '${item.hex}', // Zona R = ${item.id}\n`;
+    });
+    code += "]";
+
+    paletteOutput.value = code;
+  });
+</script>
+
+</body>
+</html>

@@ -1,17 +1,16 @@
+/* PANTALLAS */
 .screen {
-  display: none;
+  display: none !important;
   width: 100vw;
   height: 100vh;
   position: absolute;
   top: 0;
   left: 0;
-  background-color: #f1f5f9;
-  overflow: hidden;
 }
 
+/* La pantalla activa es la ÚNICA que se muestra */
 .screen.active {
-  display: flex;
-  flex-direction: column;
+  display: flex !important;
 }
 
 .app-header, .game-header {
@@ -79,12 +78,27 @@
   mix-blend-mode: multiply; /* Convierte el blanco del PNG en transparente */
 }
 
-.btn-back {
-  padding: 8px 14px;
-  background-color: #f1f5f9;
-  color: #1c1c1e;
+/* Botón Circular Flotante para volver al menú */
+.btn-back-circle {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background-color: #ffffff;
   border: none;
-  border-radius: 8px;
-  font-weight: 600;
+  color: #1e293b;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
   cursor: pointer;
+  z-index: 50; /* Garantiza que quede siempre por encima del Canvas */
+  transition: transform 0.15s ease, background-color 0.15s ease;
+}
+
+.btn-back-circle:active {
+  transform: scale(0.92);
+  background-color: #f1f5f9;
 }
