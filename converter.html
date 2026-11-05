@@ -32,12 +32,18 @@
     <small>Aumenta este valor si te salen más colores de los que realmente tiene el dibujo.</small>
   </div>
 
+  <div class="control-group">
+    <label><input type="checkbox" id="ignoreGray" checked> Ignorar grises (antialiasing de las líneas)</label>
+    <small>Desmárcalo solo si el dibujo tiene zonas realmente grises que quieras pintar.</small>
+  </div>
+
   <button id="processBtn" disabled>Generar Máscara y Paleta Exacta</button>
 
   <div id="stats" class="stats"></div>
 
   <h3>1. Máscara Generada (Guardar como <code>Dibujo-X-map.png</code>):</h3>
   <img id="resultImage" alt="Resultado de la máscara" />
+  <a id="downloadLink" download="Dibujo-X-map.png" style="display:none; margin-top:10px">⬇ Descargar mapa PNG</a>
 
   <h3>2. Paleta exacta para <code>js/drawings.js</code>:</h3>
   <textarea id="paletteOutput" readonly></textarea>
@@ -51,6 +57,8 @@
   const resultImage = document.getElementById('resultImage');
   const paletteOutput = document.getElementById('paletteOutput');
   const stats = document.getElementById('stats');
+  const downloadLink = document.getElementById('downloadLink');
+  const ignoreGray = document.getElementById('ignoreGray');
 
   let loadedImg = null;
 
@@ -71,10 +79,118 @@
     reader.readAsDataURL(file);
   });
 
-  // Distancia cromática RGB
-  function colorDistance(r1, g1, b1, r2, g2, b2) {
-    return Math.sqrt((r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2);
+  // ==CORE START==
+  const LINE_MAX = 15;      // R, G y B por debajo = línea negra
+  const WHITE_MIN = 245;    // R, G y B por encima = fondo blanco
+  const FLAT2 = 12 * 12;    // un píxel es "plano" si sus vecinos difieren menos que esto (distancia²)
+  const GRAY_SAT = 14;      // max(RGB) - min(RGB) <= esto => gris
+  const AA_PASSES = 2;      // px que los bordes suavizados heredan del color vecino
+
+  const dist2 = (r1, g1, b1, r2, g2, b2) => (r1 - r2) ** 2 + (g1 - g2) ** 2 + (b1 - b2) ** 2;
+  const toHex = (r, g, b) => '#' + [r, g, b].map((v) => v.toString(16).padStart(2, '0')).join('');
+
+  // Modifica `data` (RGBA) dejando la máscara: ID en R, G=B=0, A=255. Devuelve { palette } o { error }.
+  function buildMask(data, width, height, tol2, ignoreGray) {
+    const n = width * height;
+
+    // 0 = fondo, 1 = línea negra, 2 = interior plano (candidato a color), 3 = resto (antialiasing/bordes)
+    const cls = new Uint8Array(n);
+    for (let p = 0, i = 0; p < n; p++, i += 4) {
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      if (data[i + 3] < 10 || (r > WHITE_MIN && g > WHITE_MIN && b > WHITE_MIN)) cls[p] = 0;
+      else if (r < LINE_MAX && g < LINE_MAX && b < LINE_MAX) cls[p] = 1;
+      else cls[p] = 3;
+    }
+
+    // Solo los píxeles del INTERIOR de una zona (vecinos casi idénticos) definen la paleta.
+    // Las rampas de antialiasing cambian de un píxel al siguiente, así que quedan fuera.
+    const far = (i, q) => {
+      const j = q * 4;
+      return dist2(data[i], data[i + 1], data[i + 2], data[j], data[j + 1], data[j + 2]) > FLAT2;
+    };
+    for (let y = 0; y < height; y++) {
+      for (let x = 0; x < width; x++) {
+        const p = y * width + x;
+        if (cls[p] !== 3) continue;
+        const i = p * 4;
+        if (ignoreGray && Math.max(data[i], data[i + 1], data[i + 2]) - Math.min(data[i], data[i + 1], data[i + 2]) <= GRAY_SAT) continue;
+        const notFlat =
+          (x > 0 && far(i, p - 1)) || (x < width - 1 && far(i, p + 1)) ||
+          (y > 0 && far(i, p - width)) || (y < height - 1 && far(i, p + width));
+        if (!notFlat) cls[p] = 2;
+      }
+    }
+
+    // PASO 1: histograma (celdas de 8 niveles/canal) solo de píxeles interiores
+    const bins = new Map();
+    for (let p = 0, i = 0; p < n; p++, i += 4) {
+      if (cls[p] !== 2) continue;
+      const r = data[i], g = data[i + 1], b = data[i + 2];
+      const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+      const bin = bins.get(key);
+      if (bin) { bin.n++; bin.r += r; bin.g += g; bin.b += b; }
+      else bins.set(key, { n: 1, r, g, b });
+    }
+
+    const minPixels = Math.max(12, Math.floor(n * 0.00002));
+    const palette = [];
+    [...bins.values()]
+      .filter((bin) => bin.n >= minPixels)
+      .sort((a, b) => b.n - a.n)
+      .forEach((bin) => {
+        const r = Math.round(bin.r / bin.n), g = Math.round(bin.g / bin.n), b = Math.round(bin.b / bin.n);
+        if (palette.some((q) => dist2(r, g, b, q.r, q.g, q.b) <= tol2)) return;
+        palette.push({ id: palette.length + 1, r, g, b, hex: toHex(r, g, b) });
+      });
+
+    if (!palette.length) return { error: '❌ No se detectaron colores. Baja la tolerancia o desmarca "Ignorar grises".' };
+    if (palette.length > 255) return { error: `❌ ${palette.length} colores: el canal R solo admite 255. Sube la tolerancia.` };
+
+    // PASO 2: los interiores toman el color más cercano de la paleta
+    const cache = new Map();
+    const classify = (r, g, b) => {
+      const key = (r << 16) | (g << 8) | b;
+      let id = cache.get(key);
+      if (id !== undefined) return id;
+      let best = Infinity;
+      id = 0;
+      for (const q of palette) {
+        const d = dist2(r, g, b, q.r, q.g, q.b);
+        if (d < best) { best = d; id = q.id; }
+      }
+      if (best > tol2) id = 0;
+      cache.set(key, id);
+      return id;
+    };
+
+    let ids = new Uint8Array(n);
+    for (let p = 0, i = 0; p < n; p++, i += 4) {
+      if (cls[p] !== 2) continue;
+      ids[p] = classify(data[i], data[i + 1], data[i + 2]);
+      if (!ids[p]) cls[p] = 3;
+    }
+
+    // Los bordes suavizados NO se asignan por color (daría anillos grises): heredan el ID del vecino
+    for (let pass = 0; pass < AA_PASSES; pass++) {
+      const next = ids.slice();
+      for (let y = 0; y < height; y++) {
+        for (let x = 0; x < width; x++) {
+          const p = y * width + x;
+          if (cls[p] !== 3 || ids[p]) continue;
+          const id = (x > 0 && ids[p - 1]) || (x < width - 1 && ids[p + 1]) ||
+                     (y > 0 && ids[p - width]) || (y < height - 1 && ids[p + width]) || 0;
+          if (id) next[p] = id;
+        }
+      }
+      ids = next;
+    }
+
+    for (let p = 0, i = 0; p < n; p++, i += 4) {
+      data[i] = ids[p]; data[i + 1] = 0; data[i + 2] = 0; data[i + 3] = 255; // opaco: sin pérdidas por alpha
+    }
+    return { palette };
   }
+  // ==CORE END==
 
   processBtn.addEventListener('click', () => {
     if (!loadedImg) return;
@@ -86,84 +202,23 @@
     const canvas = document.createElement('canvas');
     canvas.width = width;
     canvas.height = height;
-    const ctx = canvas.getContext('2d');
-
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
     ctx.drawImage(loadedImg, 0, 0);
 
     const imgData = ctx.getImageData(0, 0, width, height);
-    const data = imgData.data;
-
-    const palette = []; // Guardará { id, r, g, b, hex }
-    
-    // PASO 1: Detectar y agrupar colores únicos principales
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-
-      // Omitir píxeles transparentes o blancos de fondo
-      if (a < 10 || (r > 245 && g > 245 && b > 245)) continue;
-
-      // Omitir líneas negras puras
-      if (r < 15 && g < 15 && b < 15) continue;
-
-      // Comprobar si coincide con un color ya existente en la paleta
-      let match = palette.find(item => colorDistance(r, g, b, item.r, item.g, item.b) <= tolerance);
-
-      if (!match) {
-        const hex = `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
-        palette.push({ id: palette.length + 1, r, g, b, hex });
-      }
-    }
-
-    // PASO 2: Pintar la máscara (map.png) asignando CADA píxel a su ID exacto (1..N)
-    for (let i = 0; i < data.length; i += 4) {
-      const r = data[i];
-      const g = data[i + 1];
-      const b = data[i + 2];
-      const a = data[i + 3];
-
-      if (a < 10 || (r > 245 && g > 245 && b > 245)) {
-        data[i] = 0;     // Fondo = R: 0
-        data[i + 1] = 0;
-        data[i + 2] = 0;
-        data[i + 3] = 0;
-        continue;
-      }
-
-      // Buscar el color más cercano en la paleta final compilada
-      let closestID = 1;
-      let minDistance = Infinity;
-
-      for (const item of palette) {
-        const dist = colorDistance(r, g, b, item.r, item.g, item.b);
-        if (dist < minDistance) {
-          minDistance = dist;
-          closestID = item.id;
-        }
-      }
-
-      // Guardar ID en la canal Roja
-      data[i] = closestID;
-      data[i + 1] = 0;
-      data[i + 2] = 0;
-      data[i + 3] = 255;
-    }
-
+    const { palette, error } = buildMask(imgData.data, width, height, tolerance ** 2, ignoreGray.checked);
+    if (error) { stats.textContent = error; return; }
     ctx.putImageData(imgData, 0, 0);
 
-    // Mostrar imagen y texto
-    resultImage.src = canvas.toDataURL('image/png');
-    stats.textContent = `✅ ¡Hecho! Paleta compilada con exactamente ${palette.length} colores (Regiones 1 a ${palette.length}).`;
+    const url = canvas.toDataURL('image/png');
+    resultImage.src = url;
+    downloadLink.href = url;
+    downloadLink.style.display = 'inline-block';
+    stats.textContent = `✅ ¡Hecho! Paleta con ${palette.length} colores (regiones 1 a ${palette.length}).`;
 
-    // Código formateado para js/drawings.js
-    let code = "palette: [\n";
-    palette.forEach(item => {
-      code += `  '${item.hex}', // Zona R = ${item.id}\n`;
-    });
-    code += "]";
-
+    let code = 'palette: [\n';
+    palette.forEach((item) => { code += `  '${item.hex}', // Zona R = ${item.id}\n`; });
+    code += ']';
     paletteOutput.value = code;
   });
 </script>

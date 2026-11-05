@@ -7,16 +7,11 @@ export const DRAWINGS_CATALOG = [
     lines: "imgs/Dibujo-1-lines.png",
     map: "imgs/Dibujo-1-map.png",
 palette: [
-  '#959595', // Zona R = 1
-  '#6b6b6b', // Zona R = 2
-  '#444444', // Zona R = 3
-  '#1b1b1b', // Zona R = 4
-  '#babba2', // Zona R = 5
-  '#dce05d', // Zona R = 6
-  '#e8ef1c', // Zona R = 7
-  '#d4d4d4', // Zona R = 8
-  '#f3f3f3', // Zona R = 9
-  '#373782', // Zona R = 10
+  '#12dfec', // Zona R = 1
+  '#374215', // Zona R = 2
+  '#6b4b18', // Zona R = 3
+  '#ecd012', // Zona R = 4
+  '#18286b', // Zona R = 5
 ]
   },
   {
@@ -30,6 +25,34 @@ palette: [
       '#ffa502', // Zona R = 2 -> Color 2
       '#70a1ff'  // Zona R = 3 -> Color 3
     ]
+  },{
+id: 3,
+    type: "mystery",
+    icon: "imgs/iconM.png",
+    lines: "imgs/Dibujo-3-lines.png",
+    map: "imgs/Dibujo-3-map.png",
+    palette: [
+    '#7cefe0', // Zona R = 1
+    '#85b941', // Zona R = 2
+    '#f3cf8a', // Zona R = 3
+    '#cdc8ab', // Zona R = 4
+    '#ffe86c', // Zona R = 5
+    '#dd7cef', // Zona R = 6
+    '#c4982f', // Zona R = 7
+    '#ceb580', // Zona R = 8
+    '#f4cb3e', // Zona R = 9
+    '#c73ef4', // Zona R = 10
+    '#ff3000', // Zona R = 11
+    '#8e5399', // Zona R = 12
+    '#4d2da7', // Zona R = 13
+    '#edff20', // Zona R = 14
+    '#2da76f', // Zona R = 15
+    '#ffea00', // Zona R = 16
+    '#c42f2f', // Zona R = 17
+    '#e45c27', // Zona R = 18
+    '#503355', // Zona R = 19
+    '#bd1915', // Zona R = 20
+]
   }
 ];
 

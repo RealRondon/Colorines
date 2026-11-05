@@ -13,6 +13,28 @@ function textColorFor(hex) {
   return lum > 0.6 ? '#111' : '#fff';
 }
 
+// Retira un color ya terminado y, si era el activo, selecciona el siguiente disponible
+export function completeColor(colorNum) {
+  const container = document.querySelector('.color-palette');
+  const btn = container?.querySelector(`.color-btn[data-number="${colorNum}"]`);
+  if (!btn || btn.classList.contains('done')) return;
+
+  const wasActive = btn.classList.contains('active');
+  const free = (el) => { while (el && el.classList.contains('done')) el = el.nextElementSibling; return el; };
+  const freePrev = (el) => { while (el && el.classList.contains('done')) el = el.previousElementSibling; return el; };
+  const next = free(btn.nextElementSibling) || freePrev(btn.previousElementSibling);
+
+  btn.classList.remove('active');
+  btn.classList.add('done'); // la animación de salida está en el CSS
+  setTimeout(() => btn.remove(), 300);
+
+  if (wasActive && next) {
+    next.classList.add('active');
+    selectedColorNumber = Number(next.dataset.number);
+    next.scrollIntoView({ behavior: 'smooth', inline: 'center', block: 'nearest' });
+  }
+}
+
 export function renderDynamicPalette(paletteArray = []) {
   const container = document.querySelector('.color-palette');
   if (!container) {

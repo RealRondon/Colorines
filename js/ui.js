@@ -35,7 +35,7 @@ export function initUI(onPlayCallback) {
       return;
     }
 
-    if (e.target.closest('#btn-back')) {
+    if (e.target.closest('#btn-back, #btn-win-menu')) {
       gameScreen?.classList.remove('active');
       mainMenu?.classList.add('active');
     }

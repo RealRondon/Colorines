@@ -59,6 +59,20 @@
 
     <!-- Paleta dinámica (la genera palette.js) -->
     <div class="color-palette"></div>
+
+    <!-- Pantalla de enhorabuena (se muestra al terminar el dibujo) -->
+    <div id="win-overlay" class="win-overlay" hidden>
+      <div class="win-card">
+        <div class="win-emoji">🎉</div>
+        <h2>¡Enhorabuena!</h2>
+        <p>Has completado el dibujo</p>
+        <img id="win-preview" alt="Tu dibujo terminado" hidden>
+        <div class="win-actions">
+          <button id="btn-restart" class="btn-primary" type="button">Reiniciar dibujo</button>
+          <button id="btn-win-menu" class="btn-secondary" type="button">Volver al menú</button>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- drawings.js ya es módulo: lo importa main.js -->

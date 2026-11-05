@@ -4,13 +4,14 @@ import { renderDynamicPalette, getSelectedColorNumber } from './palette.js';
 const TAP_RADIUS = 4;        // px de tolerancia al tocar sobre una línea
 const MIN_REGION_SIZE = 20;  // componentes más pequeños se descartan como ruido
 
-const hooks = { onProgress: null, onComplete: null, onWrongColor: null };
+const hooks = { onProgress: null, onComplete: null, onWrongColor: null, onColorComplete: null };
 const state = {
-  token: 0, w: 0, h: 0,
+  token: 0, currentId: 1, w: 0, h: 0,
   canvas: null, ctx: null, image: null,
   labels: null,   // Int32Array: >0 = región, 0 = borde, -1 = ruido
   regions: [],    // regions[label] = { colorNum, minX, minY, maxX, maxY, painted }
   rgb: [], painted: 0,
+  remaining: [], // remaining[colorNum] = regiones sin pintar de ese color
 };
 
 export function setEngineCallbacks(cb = {}) {
@@ -29,8 +30,10 @@ export async function loadColorByNumberDrawing(id = 1) {
     console.error('❌ Faltan #paint-canvas o #lineart-overlay en el HTML.');
     return;
   }
+  canvas.style.visibility = overlay.style.visibility = 'hidden'; // sin restos del dibujo anterior
 
   const drawing = DRAWINGS_CATALOG.find((d) => d.id === id) || DRAWINGS_CATALOG[0];
+  state.currentId = drawing.id;
   const palette = drawing.palette || [];
   renderDynamicPalette(palette);
 
@@ -50,6 +53,12 @@ export async function loadColorByNumberDrawing(id = 1) {
       console.warn(`⚠️ El mapa usa el ID ${maxId} pero la paleta solo tiene ${palette.length} colores.`);
     }
 
+    const remaining = new Array(palette.length + 1).fill(0);
+    for (let l = 1; l < regions.length; l++) {
+      const c = regions[l].colorNum;
+      remaining[c] = (remaining[c] || 0) + 1;
+    }
+
     canvas.width = w;
     canvas.height = h;
     const ctx = canvas.getContext('2d');
@@ -57,9 +66,12 @@ export async function loadColorByNumberDrawing(id = 1) {
     image.data.fill(255); // lienzo blanco opaco
     ctx.putImageData(image, 0, 0);
 
-    Object.assign(state, { w, h, canvas, ctx, image, labels, regions, painted: 0, rgb: palette.map(hexToRgb) });
+    Object.assign(state, { w, h, canvas, ctx, image, labels, regions, painted: 0, remaining, rgb: palette.map(hexToRgb) });
     overlay.src = drawing.lines;
+    canvas.style.visibility = overlay.style.visibility = 'visible';
     hooks.onProgress?.(0, regions.length - 1);
+    // colores de la paleta que no aparecen en el mapa: nada que pintar, se retiran ya
+    for (let c = 1; c <= palette.length; c++) if (!remaining[c]) hooks.onColorComplete?.(c);
   } catch (err) {
     console.error('❌ Error cargando el dibujo:', err);
   }
@@ -220,6 +232,7 @@ function paintRegion(label) {
   state.painted++;
   const total = regions.length - 1;
   hooks.onProgress?.(state.painted, total);
+  if (--state.remaining[region.colorNum] === 0) hooks.onColorComplete?.(region.colorNum);
   if (state.painted === total) hooks.onComplete?.();
 }
 
@@ -228,4 +241,31 @@ function hexToRgb(hex) {
   if (s.length === 3) s = s.replace(/./g, (c) => c + c);
   const n = parseInt(s, 16);
   return { r: (n >> 16) & 255, g: (n >> 8) & 255, b: n & 255 };
+}
+
+/* ---------- Fin de nivel ---------- */
+
+export function restartCurrentDrawing() {
+  return loadColorByNumberDrawing(state.currentId);
+}
+
+// Pintura + líneas combinadas en una miniatura (para la pantalla de enhorabuena)
+export function getResultImage(maxSize = 480) {
+  const { canvas, w, h } = state;
+  const overlay = document.getElementById('lineart-overlay');
+  if (!canvas || !overlay || !w) return '';
+  try {
+    const scale = Math.min(1, maxSize / Math.max(w, h));
+    const out = document.createElement('canvas');
+    out.width = Math.round(w * scale);
+    out.height = Math.round(h * scale);
+    const ctx = out.getContext('2d');
+    ctx.drawImage(canvas, 0, 0, out.width, out.height);
+    ctx.globalCompositeOperation = 'multiply';
+    ctx.drawImage(overlay, 0, 0, out.width, out.height);
+    return out.toDataURL('image/png');
+  } catch (err) {
+    console.warn('⚠️ No se pudo generar la miniatura final:', err);
+    return '';
+  }
 }
