@@ -1,6 +1,5 @@
-// CATÁLOGO COMPLETO DE DIBUJOS DEL JUEGO
 // CATÁLOGO DE DIBUJOS DEL JUEGO
-const DRAWINGS_CATALOG = [
+export const DRAWINGS_CATALOG = [
   {
     id: 1,
     type: "normal",
@@ -35,7 +34,7 @@ palette: [
 ];
 
 // RENDERIZADO DEL GRID EN EL MENÚ
-function renderSearchGrid(container) {
+export function renderSearchGrid(container) {
   if (!container) return;
   container.innerHTML = '';
 

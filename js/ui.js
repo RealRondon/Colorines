@@ -1,3 +1,5 @@
+const TAB_WIDTH = 100 / 3; // el slider tiene 3 pestañas
+
 export function initUI(onPlayCallback) {
   const mainMenu = document.getElementById('main-menu');
   const gameScreen = document.getElementById('game-screen');
@@ -5,50 +7,37 @@ export function initUI(onPlayCallback) {
   const navItems = Array.from(document.querySelectorAll('.nav-item'));
   const headerTitle = document.getElementById('header-title');
 
-  // Inicializar slider
   let currentTabIndex = 1;
-  if (tabSlider) {
-    tabSlider.style.transform = 'translateX(-33.33333%)';
-  }
+  if (tabSlider) tabSlider.style.transform = `translateX(${-TAB_WIDTH}%)`;
 
   // Navegación del carrusel inferior
   navItems.forEach((item) => {
     item.addEventListener('click', () => {
-      const tabIndex = parseInt(item.getAttribute('data-tab'));
-      if (tabIndex === currentTabIndex) return;
+      const tabIndex = Number(item.dataset.tab);
+      if (!tabSlider || Number.isNaN(tabIndex) || tabIndex === currentTabIndex) return;
 
       navItems.forEach((nav) => nav.classList.remove('active'));
       item.classList.add('active');
-
-      const offsetPercentage = tabIndex * -33.33333;
-      tabSlider.style.transform = `translateX(${offsetPercentage}%)`;
-
+      tabSlider.style.transform = `translateX(${-tabIndex * TAB_WIDTH}%)`;
       currentTabIndex = tabIndex;
-      if (headerTitle) headerTitle.textContent = item.getAttribute('data-title');
+      if (headerTitle && item.dataset.title) headerTitle.textContent = item.dataset.title;
     });
   });
 
-  // Delegación de clics para cambiar de pantalla
+  // Delegación de clics: abrir dibujo / volver al menú
   document.addEventListener('click', (e) => {
     const trigger = e.target.closest('.play-trigger');
     if (trigger) {
-      const drawingId = parseInt(trigger.getAttribute('data-id'));
-      console.log(`\n🖱️ Clic detectado en dibujo ID: ${drawingId}`);
-
-      if (typeof onPlayCallback === 'function') {
-        onPlayCallback(drawingId);
-      }
-
-      if (mainMenu) mainMenu.classList.remove('active');
-      if (gameScreen) gameScreen.classList.add('active');
+      const drawingId = Number(trigger.dataset.id);
+      mainMenu?.classList.remove('active');
+      gameScreen?.classList.add('active'); // primero visible, luego carga
+      if (!Number.isNaN(drawingId)) onPlayCallback?.(drawingId);
       return;
     }
 
-    const backBtn = e.target.closest('#btn-back');
-    if (backBtn) {
-      console.log("⬅️ Volviendo al menú principal.");
-      if (gameScreen) gameScreen.classList.remove('active');
-      if (mainMenu) mainMenu.classList.add('active');
+    if (e.target.closest('#btn-back')) {
+      gameScreen?.classList.remove('active');
+      mainMenu?.classList.add('active');
     }
   });
 }

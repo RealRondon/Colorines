@@ -1,22 +1,25 @@
 import { initUI } from './ui.js';
-import { loadColorByNumberDrawing, initEngineEvents } from './engine.js';
+import { renderSearchGrid } from './drawings.js';
+import { loadColorByNumberDrawing, initEngineEvents, setEngineCallbacks } from './engine.js';
 
-window.addEventListener('load', () => {
-  console.log("🚀 Aplicación modular iniciada.");
-
+function init() {
   const searchGrid = document.getElementById('search-grid');
+  if (searchGrid) renderSearchGrid(searchGrid);
 
-  // Renderizar grid inicial de búsqueda si la función global existe
-  if (typeof renderSearchGrid === 'function' && searchGrid) {
-    renderSearchGrid(searchGrid);
-    console.log("✅ Grid de búsqueda renderizado.");
-  }
-
-  // Inicializar controlador de interfaz
-  initUI((drawingId) => {
-    loadColorByNumberDrawing(drawingId);
-  });
-
-  // Inicializar eventos del motor de dibujo
+  initUI((drawingId) => loadColorByNumberDrawing(drawingId));
   initEngineEvents();
-});
+
+  // Ganchos opcionales: conéctalos a tu UI (barra de progreso, pantalla final...)
+  setEngineCallbacks({
+    onProgress: (done, total) => console.log(`🎨 ${done}/${total} regiones`),
+    onComplete: () => console.log('🎉 ¡Dibujo completado!'),
+    onWrongColor: () => navigator.vibrate?.(20),
+  });
+}
+
+// Los módulos son diferidos: normalmente el DOM ya está listo, pero por si acaso
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', init);
+} else {
+  init();
+}

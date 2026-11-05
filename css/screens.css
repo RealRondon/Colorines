@@ -1,33 +1,38 @@
-/* PANTALLAS */
+/* PANTALLAS: una sola definición, ocupan el viewport visible */
 .screen {
-  display: none !important;
-  width: 100vw;
-  height: 100vh;
-  position: absolute;
-  top: 0;
-  left: 0;
+  display: none;
+  position: fixed;
+  inset: 0;
+  flex-direction: column;
 }
 
-/* La pantalla activa es la ÚNICA que se muestra */
 .screen.active {
-  display: flex !important;
+  display: flex;
 }
 
-.app-header, .game-header {
-  height: 60px;
-  background-color: #ffffff;
+.app-header {
+  flex: 0 0 auto;
+  height: calc(60px + env(safe-area-inset-top, 0px));
+  padding: env(safe-area-inset-top, 0px) 16px 0;
   display: flex;
   align-items: center;
-  padding: 0 16px;
+  background-color: #ffffff;
   box-shadow: 0 1px 4px rgba(0, 0, 0, 0.05);
   z-index: 10;
 }
 
+.app-header h1 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #1c1c1e;
+}
+
+/* El alto lo reparte flexbox: sin números mágicos tipo calc(100vh - 125px) */
 .menu-content {
-  width: 100%;
-  height: calc(100vh - 125px);
-  overflow: hidden;
+  flex: 1;
+  min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .tab-slider {
@@ -41,64 +46,35 @@
   width: 33.33333%;
   height: 100%;
   overflow-y: auto;
-  box-sizing: border-box;
 }
 
 .canvas-container {
   position: relative;
-  width: 100%;
-  height: calc(100vh - 135px);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  flex: 1;
+  min-height: 0;
   overflow: hidden;
 }
 
+/* paint-canvas y overlay deben ser idénticos en tamaño y posición:
+   el motor convierte coordenadas usando el rect del canvas */
 #paint-canvas,
 #lineart-overlay {
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  max-width: 90%;
-  max-height: 80vh;
+  max-width: 92%;
+  max-height: 92%;
   width: auto;
   height: auto;
-  box-sizing: border-box;
 }
 
 #paint-canvas {
-  pointer-events: auto;
   z-index: 1;
 }
 
 #lineart-overlay {
-  pointer-events: none;
   z-index: 2;
-  mix-blend-mode: multiply; /* Convierte el blanco del PNG en transparente */
-}
-
-/* Botón Circular Flotante para volver al menú */
-.btn-back-circle {
-  position: absolute;
-  top: 20px;
-  left: 20px;
-  width: 48px;
-  height: 48px;
-  border-radius: 50%;
-  background-color: #ffffff;
-  border: none;
-  color: #1e293b;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  cursor: pointer;
-  z-index: 50; /* Garantiza que quede siempre por encima del Canvas */
-  transition: transform 0.15s ease, background-color 0.15s ease;
-}
-
-.btn-back-circle:active {
-  transform: scale(0.92);
-  background-color: #f1f5f9;
+  pointer-events: none;
+  mix-blend-mode: multiply; /* el blanco del PNG deja ver la pintura; quítalo si el PNG ya es transparente */
 }
